@@ -4,7 +4,10 @@ import { Repository } from 'typeorm';
 import { paginate, IPaginationOptions } from 'nestjs-typeorm-paginate';
 import { QueryDto } from '../../common/dto/query.dto';
 import { applySearch } from '../../common/utils/query-builder.util';
-import { PreguntaForoEntity, EstadoPreguntaForo } from './entities/pregunta-foro.entity';
+import {
+  PreguntaForoEntity,
+  EstadoPreguntaForo,
+} from './entities/pregunta-foro.entity';
 import { CreatePreguntaForoDto } from './dto/create-pregunta-foro.dto';
 import { UpdatePreguntaForoDto } from './dto/update-pregunta-foro.dto';
 import { UsuarioEntity } from '../usuarios/usuario.entity';
@@ -23,7 +26,11 @@ export class PreguntasForoService {
 
     const qb = this.repo
       .createQueryBuilder('pregunta')
-      .leftJoinAndSelect('pregunta.usuario', 'usuario');
+      .leftJoinAndSelect('pregunta.usuario', 'usuario')
+      .loadRelationCountAndMap(
+        'pregunta.respuestasCount',
+        'pregunta.respuestas',
+      );
 
     applySearch(qb, 'pregunta', ['titulo', 'contenido'], search);
 
@@ -34,7 +41,7 @@ export class PreguntasForoService {
     const result = await paginate<PreguntaForoEntity>(qb, options);
 
     return {
-      items: result.items.map((p) => ({
+      items: result.items.map((p: any) => ({
         id: p.id.toString(),
         titulo: p.titulo,
         contenido: p.contenido,
@@ -45,7 +52,7 @@ export class PreguntasForoService {
         createdAt: p.creadoEn,
         autorNombre: `${p.usuario.nombres} ${p.usuario.apellidos}`.trim(),
         autorEmail: p.usuario.email,
-        respuestasCount: 0,
+        respuestasCount: p.respuestasCount ?? 0,
       })),
       meta: result.meta,
     };
@@ -57,7 +64,13 @@ export class PreguntasForoService {
     const qb = this.repo
       .createQueryBuilder('pregunta')
       .leftJoinAndSelect('pregunta.usuario', 'usuario')
-      .where('pregunta.estado = :estado', { estado: EstadoPreguntaForo.APROBADA });
+      .where('pregunta.estado = :estado', {
+        estado: EstadoPreguntaForo.APROBADA,
+      })
+      .loadRelationCountAndMap(
+        'pregunta.respuestasCount',
+        'pregunta.respuestas',
+      );
 
     applySearch(qb, 'pregunta', ['titulo', 'contenido'], search);
 
@@ -68,22 +81,28 @@ export class PreguntasForoService {
     const result = await paginate<PreguntaForoEntity>(qb, options);
 
     return {
-      items: result.items.map((p) => ({
+      items: result.items.map((p: any) => ({
         id: p.id.toString(),
         titulo: p.titulo,
         contenido: p.contenido,
         categoria: p.categoria,
         createdAt: p.creadoEn,
         autorNombre: `${p.usuario.nombres} ${p.usuario.apellidos}`.trim(),
-        respuestasCount: 0,
+        respuestasCount: p.respuestasCount ?? 0,
         respuestaAdmin: p.respuestaAdmin,
       })),
       meta: result.meta,
     };
   }
 
-  async createFromUser(usuarioId: number, dto: CreatePreguntaForoDto, modo: 'public' | 'admin') {
-    const usuario = await this.usuariosRepo.findOne({ where: { id: usuarioId } });
+  async createFromUser(
+    usuarioId: number,
+    dto: CreatePreguntaForoDto,
+    modo: 'public' | 'admin',
+  ) {
+    const usuario = await this.usuariosRepo.findOne({
+      where: { id: usuarioId },
+    });
     if (!usuario) throw new NotFoundException('Usuario no encontrado');
 
     const estadoFinal =
@@ -99,11 +118,33 @@ export class PreguntasForoService {
       usuarioId: usuario.id,
       estado: estadoFinal,
       respuestaAdmin: modo === 'admin' ? dto.respuestaAdmin : undefined,
-      respondidoEn: modo === 'admin' && dto.respuestaAdmin ? new Date() : undefined,
+      respondidoEn:
+        modo === 'admin' && dto.respuestaAdmin ? new Date() : undefined,
     });
 
     const saved = await this.repo.save(entidad);
-    return this.findOneById(saved.id, modo);
+
+    const base: any = {
+      id: saved.id.toString(),
+      titulo: saved.titulo,
+      contenido: saved.contenido,
+      categoria: saved.categoria,
+      createdAt: saved.creadoEn,
+      autorNombre: `${usuario.nombres} ${usuario.apellidos}`.trim(),
+      referenciaId: saved.referenciaId,
+      respuestaAdmin: saved.respuestaAdmin,
+      respondidoEn: saved.respondidoEn,
+      respuestasCount: 0,
+    };
+
+    if (modo === 'admin') {
+      base.estado = saved.estado;
+      base.autorEmail = usuario.email;
+    } else {
+      base.estado = saved.estado;
+    }
+
+    return base;
   }
 
   async findOneById(id: number, modo: 'public' | 'admin' = 'public') {
@@ -123,7 +164,8 @@ export class PreguntasForoService {
       contenido: pregunta.contenido,
       categoria: pregunta.categoria,
       createdAt: pregunta.creadoEn,
-      autorNombre: `${pregunta.usuario.nombres} ${pregunta.usuario.apellidos}`.trim(),
+      autorNombre:
+        `${pregunta.usuario.nombres} ${pregunta.usuario.apellidos}`.trim(),
       respuestaAdmin: pregunta.respuestaAdmin,
       referenciaId: pregunta.referenciaId,
       respondidoEn: pregunta.respondidoEn,
@@ -162,7 +204,9 @@ export class PreguntasForoService {
     if (!pregunta) throw new NotFoundException('Pregunta no encontrada');
 
     const nuevoEstado =
-      pregunta.estado === EstadoPreguntaForo.OCULTA ? EstadoPreguntaForo.APROBADA : EstadoPreguntaForo.OCULTA;
+      pregunta.estado === EstadoPreguntaForo.OCULTA
+        ? EstadoPreguntaForo.APROBADA
+        : EstadoPreguntaForo.OCULTA;
 
     await this.repo.update(id, { estado: nuevoEstado });
     return this.findOneById(id, 'admin');
