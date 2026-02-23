@@ -77,7 +77,8 @@ export class NoticiasController {
   delete(@Param('id', ParseIntPipe) id: number) {
     return this.servicio.delete(id);
   }
-   @Patch(':id/publicar')
+  
+  @Patch(':id/publicar')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(RolUsuario.ADMIN)
   togglePublicar(@Param('id', ParseIntPipe) id: number) {

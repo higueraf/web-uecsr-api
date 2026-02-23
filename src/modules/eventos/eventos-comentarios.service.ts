@@ -8,7 +8,7 @@ import { UpdateEventoComentarioDto } from './dto/update-evento-comentario.dto';
 
 @Injectable()
 export class EventosComentariosService {
-  private readonly AUTO_APROBAR_COMENTARIOS = true;
+  private readonly AUTO_APROBAR_COMENTARIOS = false;
 
   constructor(
     @InjectRepository(EventoComentarioEntity)

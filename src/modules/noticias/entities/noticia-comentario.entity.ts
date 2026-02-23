@@ -24,6 +24,6 @@ export class NoticiaComentarioEntity extends BaseEntity {
   @Column({ name: 'usuario_id' })
   usuarioId: number;
 
-  @Column({ default: true }) // <- si solo logueados, puedes aprobar directo
+  @Column({ type: 'boolean', default: false })
   aprobado: boolean;
 }

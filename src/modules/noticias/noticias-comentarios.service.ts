@@ -8,7 +8,7 @@ import { UpdateNoticiaComentarioDto } from './dto/update-noticia-comentario.dto'
 
 @Injectable()
 export class NoticiasComentariosService {
-  private readonly AUTO_APROBAR_COMENTARIOS = true;
+  private readonly AUTO_APROBAR_COMENTARIOS = false;
 
   constructor(
     @InjectRepository(NoticiaComentarioEntity)

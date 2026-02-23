@@ -24,6 +24,6 @@ export class EventoComentarioEntity extends BaseEntity {
   @Column({ name: 'usuario_id' })
   usuarioId: number;
 
-  @Column({ default: true })
+  @Column({ type: 'boolean', default: false })
   aprobado: boolean;
 }
